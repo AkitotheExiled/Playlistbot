@@ -30,14 +30,6 @@ class PlaylistBot():
         self.client = CONFIG.get('main', 'CLIENT_ID')
         self.secret = CONFIG.get('main', 'SECRET')
         self.subreddit = CONFIG.get('main', 'SUBREDDIT')
-        self.token_url = "https://www.reddit.com/api/v1/access_token"
-        self.token = ""
-        self.t_type = ""
-        self.reddit = praw.Reddit(client_id=self.client,
-                                  client_secret=self.secret,
-                                  password=self.password,
-                                  user_agent=self.user_agent,
-                                  username=self.user)
         self.subs = {}
         self.urls = set()
         self.post_link_date = None
@@ -63,21 +55,7 @@ class PlaylistBot():
         self.last_post = None
 
     # REDDIT
-    def get_token(self):
-        client_auth = requests.auth.HTTPBasicAuth(self.client, self.secret)
-        post_data = {'grant_type': 'password', 'username': self.user, 'password': self.password}
-        headers = {'User-Agent': self.user_agent}
-        response = requests.Session()
-        response2 = response.post(self.token_url, auth=client_auth, data=post_data, headers=headers)
-        if 'error' in response2.json().keys():
-            return 400
-        else:
-            try:
-                self.token = response2.json()['access_token']
-                self.t_type = response2.json()['token_type']
-                return 200
-            except Exception as e:
-                return print(e)
+
 
     def timedelta_to_largest_time(self, timedelta):
         print(timedelta)
