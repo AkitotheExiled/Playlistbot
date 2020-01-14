@@ -1,4 +1,7 @@
-# Installation Guide
+# DEMO
+[Demo example](example/script_example.gif)
+
+## Installation Guide
 Step 1. Make sure you have the latest version of this script downloaded.
 
 Step 2. Make sure you have Chrome downloaded and installed(preferably the latest version!).
@@ -43,7 +46,7 @@ Step 11. The bot will ask you for an ending point, You will need to enter a numb
 
 Now the bot will play song 0,1,2,3,4,5,6,7,8,9,10 automatically changing each song as the previous one ends. Once it reaches the final song, song 10 and that song ends. It will ask you again to pick a starting song point, and an ending song point.
 
-## FAQ
+### FAQ
 
 >How do I only play one song?
 
@@ -65,6 +68,3 @@ You may pause a song. You WILL have to press play in order for the song to play 
 
 Fortunately, those are not needed anymore since the bot grabs posts using pushshift's api!
 
-Below is a GIF of a test run following the above instructions!
-
-[https://imgur.com/a/WwMXK7c](https://imgur.com/a/WwMXK7c)
