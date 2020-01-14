@@ -1,5 +1,5 @@
 # DEMO
-[Demo example](example/script_example.gif)
+![Demo example](example/script_example.gif)
 
 ## Installation Guide
 Step 1. Make sure you have the latest version of this script downloaded.
