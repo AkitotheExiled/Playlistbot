@@ -1,16 +1,23 @@
 # DEMO
 ![Demo example](example/script_example.gif)
 
-## Installation Guide
+## Driver Guide
+For users wanting this script on Chrome, [chromedriver.exe](https://chromedriver.chromium.org/)
+
+For users wanting this script on Firefox, [geckodriver.exe](https://github.com/mozilla/geckodriver/releases)
+
+For users wanting this script on Internet Explorer, [IEDriverServer.exe](https://selenium.dev/downloads/)
+
+### Installation Guide
 Step 1. Make sure you have the latest version of this script downloaded.
 
-Step 2. Make sure you have Chrome downloaded and installed(preferably the latest version!).
+Step 2. Make sure you have the latest stable verion of your browser downloaded.
 
 Step 3. Organize the bot into a folder, lets call it *PlaylistBot.*
 
-Step 4. Download the [latest version of ChromeDriver.](https://chromedriver.chromium.org/)
+Step 4. Download the the latest driver for your browser(see Driver Guide above).
 
-Step 5. Place chromedriver.exe into the PlaylistBot folder.
+Step 5. Place your driver into the PlaylistBot folder.
 
 Now your folder should look like this,
 
@@ -46,7 +53,7 @@ Step 11. The bot will ask you for an ending point, You will need to enter a numb
 
 Now the bot will play song 0,1,2,3,4,5,6,7,8,9,10 automatically changing each song as the previous one ends. Once it reaches the final song, song 10 and that song ends. It will ask you again to pick a starting song point, and an ending song point.
 
-### FAQ
+#### FAQ
 
 >How do I only play one song?
 
