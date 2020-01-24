@@ -7,8 +7,28 @@ For users wanting this script on Chrome, [chromedriver.exe](https://chromedriver
 For users wanting this script on Firefox, [geckodriver.exe](https://github.com/mozilla/geckodriver/releases)
 
 For users wanting this script on Internet Explorer, [IEDriverServer.exe](https://selenium.dev/downloads/)
+### Simple Installation Guide
+Step 0. Make sure you have the latest version of this script downloaded.
 
-### Installation Guide
+Step 1. Make sure you have the latest stable verion of your browser downloaded.
+
+Step 2. Download the the latest driver for your browser(see Driver Guide above).
+
+Step 3. Place the driver(the one you just downloaded in Step 2) into the executable folder.
+
+Step 4. Select and click playlistbot.exe in the executable folder and bot should now run!
+
+EXAMPLE OF HOW YOUR EXECUTABLE FOLDER SHOULD LOOK:
+
+>executable
+
+* config.ini
+
+* playlistbot.exe
+
+* chromedriver.exe
+
+#### Original Installation Guide
 Step 1. Make sure you have the latest version of this script downloaded.
 
 Step 2. Make sure you have the latest stable verion of your browser downloaded.
@@ -53,7 +73,7 @@ Step 11. The bot will ask you for an ending point, You will need to enter a numb
 
 Now the bot will play song 0,1,2,3,4,5,6,7,8,9,10 automatically changing each song as the previous one ends. Once it reaches the final song, song 10 and that song ends. It will ask you again to pick a starting song point, and an ending song point.
 
-#### FAQ
+##### FAQ
 
 >How do I only play one song?
 
