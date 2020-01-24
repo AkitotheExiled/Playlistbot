@@ -10,18 +10,16 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchFrameException, WebDriverException
+import os
 
 
 
-# Test cases for script
-## Test if user pauses the video, determine how often to check and if video should be skipped or auto-played.
-### test if user accidentally closes the video, should the script open up a new tab where the song left off?
 
 
 class PlaylistBot():
 
     def __init__(self):
-        self.user_agent = "PlaylistBot V0.5 BETA by ScoopJr"
+        self.user_agent = "PlaylistBot V0.51 BETA by ScoopJr"
         print('Starting up...', self.user_agent)
         CONFIG = ConfigParser()
         CONFIG.read('config.ini')
@@ -37,8 +35,6 @@ class PlaylistBot():
         try:
             with open('lastposttime.txt', 'r') as r:
                 data = r.read()
-                # time_data = datetime.strptime(data, '%Y-%m-%d %H:%M:%S')
-                # before_time = self.timedelta_to_largest_time(datetime.now()-time_data)
             self.before = data
             print('The last grabbed posts UTC timestamp is', self.before)
         except IOError:
@@ -46,15 +42,32 @@ class PlaylistBot():
             self.before = 'Never.'
         if not self.before:
             self.before = 'Never.'
-        # SELENIUM STUFF BABY
-        try:
-            self.driver = webdriver.Chrome('chromedriver.exe')
-        except WebDriverException:
-            print('MESSAGE: chromedriver.exe needs to be in the same folder as the script. Please contain playlistbot.py and chromedriver.exe in the same folder.')
-            exit()
+        # SELENIUM STUFF
+        print('Now searching for the appropriate driver.. Please make sure your driver is in the script folder.')
+        for filename in os.listdir(os.getcwd()):
+            if filename == 'chromedriver.exe':
+                try:
+                    self.driver = webdriver.Chrome('chromedriver.exe')
+                except WebDriverException:
+                    print(
+                        'MESSAGE: chromedriver.exe needs to be in the same folder as the script. Please contain playlistbot.py and chromedriver.exe in the same folder.')
+                    exit()
+            if filename == 'geckodriver.exe':
+                try:
+                    self.driver = webdriver.Firefox('geckodriver.exe')
+                except WebDriverException:
+                    print(
+                        'MESSAGE: geckodriver.exe needs to be in the same folder as the script. Please contain playlistbot.py and geckodriver.exe in the same folder.')
+                    exit()
+            if filename == 'IEDriverServer.exe':
+                try:
+                    self.driver = webdriver.Ie('IEDriverServer.exe')
+                except WebDriverException:
+                    print(
+                        'MESSAGE: IEDriverServer.exe needs to be in the same folder as the script. Please contain playlistbot.py and IEDriverServer.exe in the same folder.')
+                    exit()
         self.last_post = None
 
-    # REDDIT
 
 
     def timedelta_to_largest_time(self, timedelta):
