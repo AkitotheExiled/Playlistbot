@@ -1,5 +1,5 @@
-# DEMO
-![Demo example](example/script_example.gif)
+# WARNING THIS BRANCH CONTAINS EXPERIMENTAL CHANGES AND MAY NOT WORK CORRECTLY
+
 
 ## Driver Guide
 For users wanting this script on Chrome, [chromedriver.exe](https://chromedriver.chromium.org/)
