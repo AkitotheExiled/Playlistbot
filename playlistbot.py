@@ -1,4 +1,5 @@
 import praw
+from threading import Thread
 from configparser import ConfigParser
 from datetime import datetime, timedelta
 import requests, requests.auth
@@ -9,7 +10,7 @@ from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
-from selenium.common.exceptions import NoSuchFrameException, WebDriverException
+from selenium.common.exceptions import NoSuchFrameException, WebDriverException, TimeoutException
 import os
 
 
@@ -19,7 +20,7 @@ import os
 class PlaylistBot():
 
     def __init__(self):
-        self.user_agent = "PlaylistBot V0.51 BETA by ScoopJr"
+        self.user_agent = "PlaylistBot V0.55 BETA by ScoopJr"
         print('Starting up...', self.user_agent)
         CONFIG = ConfigParser()
         CONFIG.read('config.ini')
@@ -32,9 +33,18 @@ class PlaylistBot():
         self.urls = set()
         self.post_link_date = None
         self.now = datetime.now()
+        self.thread_running = True
+        self.repeat_url = None
+        self.to_repeat = False
+        self.should_skip = False
+        self.should_stop = False
+        self.thread_should_stop = False
+        self.t1 = None
+        # Bot tracking the last post made to scrub video urls
         try:
             with open('lastposttime.txt', 'r') as r:
                 data = r.read()
+            # self.before is the timestamp used to determine where the bot should start on next run
             self.before = data
             print('The last grabbed posts UTC timestamp is', self.before)
         except IOError:
@@ -138,31 +148,107 @@ class PlaylistBot():
         result = re.search(pattern, url)
         return result.group(2)
 
-    def play_song(self, low_v, high_v):
+    def convert_video_time_to_minute_seconds(self, time_seconds):
+        time = divmod(time_seconds, 60)
+        return time
+
+    def get_video_time(self, stop):
+        is_video_playing = False
+        STATES = ( -1, 5)
+        while self.thread_running:
+            if stop():
+                break
+            player_state = self.driver.execute_script(
+                "return document.getElementById('movie_player').getPlayerState()")
+            try:
+                print(player_state)
+                if player_state in STATES:
+                    is_video_playing = False
+                video_time = self.driver.execute_script(
+                    "return document.getElementById('movie_player').getCurrentTime()")
+                video_len = self.driver.execute_script(
+                    "return document.getElementById('movie_player').getDuration()")
+                if video_time or video_len:
+                    cur_time = self.convert_video_time_to_minute_seconds(int(video_time))
+                    total_dur = self.convert_video_time_to_minute_seconds(int(video_len))
+                    print(f"{cur_time[0]}:{cur_time[1]}/{total_dur[0]}:{total_dur[1]}")
+                    print(((cur_time[0] & cur_time[1]) == (total_dur[0] & total_dur[1])))
+                    if ((cur_time[0] & cur_time[1]) == (total_dur[0] & total_dur[1])):
+                        self.should_skip = True
+                        self.thread_should_stop = True
+            except NoSuchFrameException:
+                continue
+            if not is_video_playing:
+                if player_state == 1:
+                    is_video_playing = True
+                if player_state == 0:
+                    self.driver.execute_script('document.getElementsByTagName("video")[0].pause()')
+                if player_state == -1:
+                    try:
+                        #self.driver.switch_to.frame(self.driver.find_element_by_id('player'))
+                        try:
+                            time.sleep(2)
+                            self.driver.execute_script("return document.getElementById('movie_player').playVideo()")
+                        except Exception as e:
+                            print(e)
+                        try:
+                            WebDriverWait(self.driver, 2).until(EC.element_to_be_clickable((By.XPATH, "//button[@class='ytp-ad-skip-button ytp-button']"))).click()
+                        except TimeoutException as e:
+                            print(e.msg)
+                    except NoSuchFrameException:
+                        print('The script could not find the video player.  An ad may be playing right now!')
+                if player_state == 5:
+                    print("Video has been removed.  Going to next video.")
+                    self.should_skip = True
+                if player_state == 3:
+                    time.sleep(4)
+                    self.driver.refresh()
+                time.sleep(1)
+
+
+    def should_skip_song(self, prompt,url=None):
+        skip_input = input(prompt)
+        if str(skip_input) == 'r' or 'repeat':
+            self.to_repeat = True
+            self.repeat_url = url
+        if str(skip_input) == 'stop':
+            self.to_repeat = False
+            self.repeat_url = None
+            self.should_stop = True
+        if 's' or 'y' in str(skip_input):
+            self.to_repeat = False
+            self.repeat_url = None
+            self.should_skip = True
+            return
+
+
+    def play_song(self, low_v, high_v=None):
+        self.should_stop = False
         db_func = dataFunc()
         urls = db_func.select_url_between_values(low_val=low_v, high_val=high_v)
         pos, act_urls = zip(*urls)
         for url in act_urls:
-            self.driver.get(url)
+            if self.should_stop:
+                return
+            if self.to_repeat:
+                self.driver.get(self.repeat_url)
+            else:
+                self.driver.get(url)
             while True:
-                skip_input = input('Do you want to skip this song?(type stop to redo track selection)')
-                if str(skip_input) == 'stop':
-                    return
-                if 's' or 'y' in str(skip_input):
+                if self.should_skip or self.should_stop:
+                    self.should_skip = False
+                    self.thread_running = True
                     break
-                player_state = self.driver.execute_script(
-                    "return document.getElementById('movie_player').getPlayerState()")
-                if player_state == 0:
-                    self.driver.execute_script('document.getElementsByTagName("video")[0].pause()')
-                    break
-                if player_state == -1:
-                    try:
-                        self.driver.switch_to.frame(self.driver.find_element_by_id('player'))
-                        WebDriverWait(self.driver, 5).until(
-                            EC.element_to_be_clickable((By.XPATH, '//button[@aria-label="Play"]'))).click()
-                    except NoSuchFrameException:
-                        print('The script could not find the video player.  An ad may be playing right now!')
-                time.sleep(4)
+                self.t1 = Thread(target=self.get_video_time, args=(lambda: self.thread_should_stop))
+                self.t1.start()
+                t2 = Thread(target=self.should_skip_song,
+                            args=('Do you want to skip this song?(type stop to redo track selection)', url))
+                t2.start()
+                t2.join()
+
+                self.thread_running = False
+
+
 
     def normal_run(self):
         self.grab_urls()
@@ -184,12 +270,9 @@ if __name__ == "__main__":
             if high == '':
                 high = None
             bot.play_song(low_v=low, high_v=high)
-
     else:
         while True:
             print('Please select the songs you want to play.')
             low = input('Starting track number')
             high = input('Ending track number(press enter to play only the starting track)')
-            if high == '':
-                high = None
             bot.play_song(low_v=low, high_v=high)
