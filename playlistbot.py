@@ -1,17 +1,17 @@
 import praw
-from threading import Thread
 from configparser import ConfigParser
 from datetime import datetime, timedelta
-import requests, requests.auth
-import time
-import re
 from data_func import dataFunc
+import requests, requests.auth
+from threading import Thread
+import time
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
-from selenium.common.exceptions import NoSuchFrameException, WebDriverException, TimeoutException
-import os
+from selenium.common.exceptions import NoSuchFrameException, WebDriverException, TimeoutException, JavascriptException
+import os, sys
+from queue import *
 
 
 
@@ -20,7 +20,7 @@ import os
 class PlaylistBot():
 
     def __init__(self):
-        self.user_agent = "PlaylistBot V0.55 BETA by ScoopJr"
+        self.user_agent = "PlaylistBot V0.59 BETA by ScoopJr"
         print('Starting up...', self.user_agent)
         CONFIG = ConfigParser()
         CONFIG.read('config.ini')
@@ -40,7 +40,13 @@ class PlaylistBot():
         self.should_stop = False
         self.thread_should_stop = False
         self.t1 = None
-        # Bot tracking the last post made to scrub video urls
+        self.last_post = None
+        self.queue = Queue()
+        self.grab_last_post_time_file()
+        self.check_for_webdriver()
+
+    def grab_last_post_time_file(self):
+        """Checks for lastposttime.txt and if it exists use the UTC inside as a reference for the last post grabbed.  Otherwise make new file"""
         try:
             with open('lastposttime.txt', 'r') as r:
                 data = r.read()
@@ -52,7 +58,9 @@ class PlaylistBot():
             self.before = 'Never.'
         if not self.before:
             self.before = 'Never.'
-        # SELENIUM STUFF
+
+    def check_for_webdriver(self):
+        """Checks for the appropriate webdriver for this script.  If the driver doesn't exist, stop the bot and return an error message"""
         print('Now searching for the appropriate driver.. Please make sure your driver is in the script folder.')
         for filename in os.listdir(os.getcwd()):
             if filename == 'chromedriver.exe':
@@ -60,27 +68,31 @@ class PlaylistBot():
                     self.driver = webdriver.Chrome('chromedriver.exe')
                 except WebDriverException:
                     print(
-                        'MESSAGE: chromedriver.exe needs to be in the same folder as the script. Please contain playlistbot.py and chromedriver.exe in the same folder.')
+                        'MESSAGE: chromedriver.exe was not found.  Please download chromedriver.exe from '
+                        ' https://chromedriver.chromium.org/' + '.' )
+                    print("MESSAGE: Make sure chromedriver.exe and playlistbot.exe are in the same folder!")
                     exit()
             if filename == 'geckodriver.exe':
                 try:
                     self.driver = webdriver.Firefox('geckodriver.exe')
                 except WebDriverException:
                     print(
-                        'MESSAGE: geckodriver.exe needs to be in the same folder as the script. Please contain playlistbot.py and geckodriver.exe in the same folder.')
+                        'MESSAGE: geckodriver.ex was not found.  Please download geckodriver.ex from '
+                        ' https://github.com/mozilla/geckodriver/releases' + '.')
+                    print("MESSAGE: Make sure geckodriver.ex and playlistbot.exe are in the same folder!")
                     exit()
             if filename == 'IEDriverServer.exe':
                 try:
                     self.driver = webdriver.Ie('IEDriverServer.exe')
                 except WebDriverException:
                     print(
-                        'MESSAGE: IEDriverServer.exe needs to be in the same folder as the script. Please contain playlistbot.py and IEDriverServer.exe in the same folder.')
+                        'MESSAGE: IRDriverServer.exe was not found.  Please download IRDriverServer.exe from '
+                        ' https://selenium-release.storage.googleapis.com/index.html' + '.')
+                    print("MESSAGE: Make sure IRDriverServer.exe and playlistbot.exe are in the same folder!")
                     exit()
-        self.last_post = None
-
-
 
     def timedelta_to_largest_time(self, timedelta):
+        """Code for converting a timedelta into a days/hours/minutes/second format for the URL function"""
         print(timedelta)
         try:
             days = timedelta.days
@@ -143,27 +155,65 @@ class PlaylistBot():
                 other_list.append(url)
         return {'youtube': youtube_list, 'soundcloud': sc_list, 'other': other_list}
 
-    def get_videoid_from_url(self, url):
-        pattern = re.compile(r'^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*')
-        result = re.search(pattern, url)
-        return result.group(2)
 
     def convert_video_time_to_minute_seconds(self, time_seconds):
+        """Converts seconds into a tuple(minute, seconds) and returns it"""
         time = divmod(time_seconds, 60)
+        if time[1] < 10:
+            new_time = list(time)
+            new_time[1] = f'0{str(time[1])}'
+            time = tuple(new_time)
         return time
 
-    def get_video_time(self, stop):
-        is_video_playing = False
-        STATES = ( -1, 5)
-        while self.thread_running:
-            if stop():
-                break
-            player_state = self.driver.execute_script(
-                "return document.getElementById('movie_player').getPlayerState()")
+    def ad_removal_before_video(self):
+        """Waits for an ad and then selects skip ad"""
+        try:
+            # self.driver.switch_to.frame(self.driver.find_element_by_id('player'))
             try:
-                print(player_state)
-                if player_state in STATES:
-                    is_video_playing = False
+                time.sleep(2)
+                self.driver.execute_script("return document.getElementById('movie_player').playVideo()")
+            except Exception as e:
+                print(e)
+            try:
+                WebDriverWait(self.driver, 2).until(EC.element_to_be_clickable(
+                    (By.XPATH, "//button[@class='ytp-ad-skip-button ytp-button']"))).click()
+            except TimeoutException as e:
+                print(e.msg)
+        except NoSuchFrameException:
+            print('The script could not find the video player.  An ad may be playing right now!')
+
+    def player_state_logic(self):
+        """ Contains the logic for the different states of the player on Youtube.
+        1 = video is playing
+        0 = video is paused
+        -1 = video is not playing(usually an ad is playing)
+        3 = buffering
+        5 = Video is queued which means the video is generally not available since we're grabbing the link
+
+        """
+        while True:
+            try:
+                player_state = self.driver.execute_script(
+                "return document.getElementById('movie_player').getPlayerState()")
+                if player_state == 1 or 3:
+                    return
+                if player_state == 0:
+                    self.driver.execute_script("return document.getElementById('movie_player').playVideo()")
+                    #self.driver.execute_script('document.getElementsByTagName("video")[0].pause()')
+                if player_state == -1:
+                    self.ad_removal_before_video()
+                if player_state == 5:
+                    print("Video has been removed.  Going to next video.")
+                    self.should_skip = True
+                time.sleep(1)
+            except JavascriptException:
+                continue
+
+    def get_video_time(self):
+        """Gets the video playtime and presents it to the user in a readable format."""
+        while True:
+            self.player_state_logic()
+            try:
                 video_time = self.driver.execute_script(
                     "return document.getElementById('movie_player').getCurrentTime()")
                 video_len = self.driver.execute_script(
@@ -172,60 +222,45 @@ class PlaylistBot():
                     cur_time = self.convert_video_time_to_minute_seconds(int(video_time))
                     total_dur = self.convert_video_time_to_minute_seconds(int(video_len))
                     print(f"{cur_time[0]}:{cur_time[1]}/{total_dur[0]}:{total_dur[1]}")
-                    print(((cur_time[0] & cur_time[1]) == (total_dur[0] & total_dur[1])))
-                    if ((cur_time[0] & cur_time[1]) == (total_dur[0] & total_dur[1])):
+                    time.sleep(1)
+                    if ((cur_time[0] == total_dur[0]) and (cur_time[1] == total_dur[1])):
                         self.should_skip = True
                         self.thread_should_stop = True
+                        sys.exit()
             except NoSuchFrameException:
                 continue
-            if not is_video_playing:
-                if player_state == 1:
-                    is_video_playing = True
-                if player_state == 0:
-                    self.driver.execute_script('document.getElementsByTagName("video")[0].pause()')
-                if player_state == -1:
-                    try:
-                        #self.driver.switch_to.frame(self.driver.find_element_by_id('player'))
-                        try:
-                            time.sleep(2)
-                            self.driver.execute_script("return document.getElementById('movie_player').playVideo()")
-                        except Exception as e:
-                            print(e)
-                        try:
-                            WebDriverWait(self.driver, 2).until(EC.element_to_be_clickable((By.XPATH, "//button[@class='ytp-ad-skip-button ytp-button']"))).click()
-                        except TimeoutException as e:
-                            print(e.msg)
-                    except NoSuchFrameException:
-                        print('The script could not find the video player.  An ad may be playing right now!')
-                if player_state == 5:
-                    print("Video has been removed.  Going to next video.")
-                    self.should_skip = True
-                if player_state == 3:
-                    time.sleep(4)
-                    self.driver.refresh()
-                time.sleep(1)
 
 
-    def should_skip_song(self, prompt,url=None):
+
+    def should_skip_song(self, prompt='Do you want to skip this song?(type stop to redo track selection)'):
+        """Asks the user if they want to skip, repeat, or stop
+        skip - skips current song
+        repeat - repeats current song
+        stop - stops the entire selection and allows user to pick new songs to play from
+        """
         skip_input = input(prompt)
-        if str(skip_input) == 'r' or 'repeat':
-            self.to_repeat = True
-            self.repeat_url = url
-        if str(skip_input) == 'stop':
-            self.to_repeat = False
-            self.repeat_url = None
-            self.should_stop = True
-        if 's' or 'y' in str(skip_input):
-            self.to_repeat = False
-            self.repeat_url = None
-            self.should_skip = True
-            return
+        while True:
+            if self.thread_should_stop:
+                return
+            if str(skip_input) == 'r' or 'repeat':
+                self.to_repeat = True
+                self.repeat_url = self.driver.current_url
+            if str(skip_input) == 'stop':
+                self.to_repeat = False
+                self.repeat_url = None
+                self.should_stop = True
+            if 's' or 'y' in str(skip_input):
+                self.to_repeat = False
+                self.repeat_url = None
+                self.should_skip = True
+                return
 
 
-    def play_song(self, low_v, high_v=None):
+    def play_song(self, start, stop=None):
+        """Handles the playing of a song, takes a starting value, and an ending value"""
         self.should_stop = False
         db_func = dataFunc()
-        urls = db_func.select_url_between_values(low_val=low_v, high_val=high_v)
+        urls = db_func.select_url_between_values(low_val=start, high_val=stop)
         pos, act_urls = zip(*urls)
         for url in act_urls:
             if self.should_stop:
@@ -238,15 +273,21 @@ class PlaylistBot():
                 if self.should_skip or self.should_stop:
                     self.should_skip = False
                     self.thread_running = True
+                    self.thread_should_stop = False
                     break
-                self.t1 = Thread(target=self.get_video_time, args=(lambda: self.thread_should_stop))
-                self.t1.start()
-                t2 = Thread(target=self.should_skip_song,
-                            args=('Do you want to skip this song?(type stop to redo track selection)', url))
-                t2.start()
-                t2.join()
-
                 self.thread_running = False
+
+    def process_threads(self,start,stop):
+        while True:
+            self.t1 = Thread(target=self.get_video_time)
+            t2 = Thread(target=self.play_song, args=[start,stop])
+            t3 = Thread(target=self.should_skip_song)
+            t2.start()
+            self.t1.start()
+            t3.start()
+            t3.join()
+
+
 
 
 
@@ -269,10 +310,11 @@ if __name__ == "__main__":
             high = input('Ending track number(press enter to play only the starting track)')
             if high == '':
                 high = None
-            bot.play_song(low_v=low, high_v=high)
+            bot.play_song(start=low, stop=high)
     else:
         while True:
             print('Please select the songs you want to play.')
             low = input('Starting track number')
             high = input('Ending track number(press enter to play only the starting track)')
-            bot.play_song(low_v=low, high_v=high)
+            bot.process_threads(start=low, stop=high)
+            #bot.play_song(start=low, stop=high)

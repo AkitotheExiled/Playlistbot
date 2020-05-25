@@ -21,8 +21,8 @@ class dataFunc:
         conn.close()
         return url+' added to table at position: '+str(pos)
 
-    def select_url_between_values(self, low_val, high_val):
-        if high_val is None:
+    def select_url_between_values(self, low_val, high_val=None):
+        if not high_val:
             items2 = []
             conn = sqlite3.connect('youtube_url.sqlite')
             cursor = conn.cursor()
@@ -32,12 +32,13 @@ class dataFunc:
             for item in data:
                 items2.append(item)
             return items2
-        items = []
-        conn = sqlite3.connect('youtube_url.sqlite')
-        cursor = conn.cursor()
-        exec_select = "SELECT ID, URL FROM Youtube \
+        else:
+            items = []
+            conn = sqlite3.connect('youtube_url.sqlite')
+            cursor = conn.cursor()
+            exec_select = "SELECT ID, URL FROM Youtube \
                       WHERE ID BETWEEN {} and {} ORDER BY ID".format(str(low_val), str(high_val))
-        data = cursor.execute(exec_select)
-        for item in data:
-            items.append(item)
-        return items
+            data = cursor.execute(exec_select)
+            for item in data:
+                items.append(item)
+            return items
