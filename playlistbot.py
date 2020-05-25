@@ -20,7 +20,7 @@ from queue import *
 class PlaylistBot():
 
     def __init__(self):
-        self.user_agent = "PlaylistBot V0.59 BETA by ScoopJr"
+        self.user_agent = "PlaylistBot V0.6 BETA by ScoopJr"
         print('Starting up...', self.user_agent)
         CONFIG = ConfigParser()
         CONFIG.read('config.ini')
@@ -164,23 +164,22 @@ class PlaylistBot():
             new_time[1] = f'0{str(time[1])}'
             time = tuple(new_time)
         return time
-
+    def return_video_duration_in_seconds(self):
+        video_len = self.driver.execute_script(
+            "return document.getElementById('movie_player').getDuration()")
+        return video_len
     def ad_removal_before_video(self):
         """Waits for an ad and then selects skip ad"""
         try:
             # self.driver.switch_to.frame(self.driver.find_element_by_id('player'))
             try:
-                time.sleep(2)
-                self.driver.execute_script("return document.getElementById('movie_player').playVideo()")
-            except Exception as e:
-                print(e)
-            try:
-                WebDriverWait(self.driver, 2).until(EC.element_to_be_clickable(
+                WebDriverWait(self.driver, 15).until(EC.element_to_be_clickable(
                     (By.XPATH, "//button[@class='ytp-ad-skip-button ytp-button']"))).click()
             except TimeoutException as e:
                 print(e.msg)
         except NoSuchFrameException:
             print('The script could not find the video player.  An ad may be playing right now!')
+
 
     def player_state_logic(self):
         """ Contains the logic for the different states of the player on Youtube.
@@ -249,6 +248,7 @@ class PlaylistBot():
                 self.to_repeat = False
                 self.repeat_url = None
                 self.should_stop = True
+                return
             if 's' or 'y' in str(skip_input):
                 self.to_repeat = False
                 self.repeat_url = None
@@ -269,13 +269,15 @@ class PlaylistBot():
                 self.driver.get(self.repeat_url)
             else:
                 self.driver.get(url)
-            while True:
                 if self.should_skip or self.should_stop:
                     self.should_skip = False
-                    self.thread_running = True
-                    self.thread_should_stop = False
-                    break
-                self.thread_running = False
+                    #self.thread_running = True
+                    #self.thread_should_stop = False
+                    continue
+                else:
+                    time_to_sleep = self.return_video_duration_in_seconds()
+                    time.sleep(time_to_sleep-4)
+
 
     def process_threads(self,start,stop):
         while True:
