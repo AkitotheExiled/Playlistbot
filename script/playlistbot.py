@@ -363,15 +363,18 @@ class PlaylistBot():
             data_func.insert_into_table(pos=data["youtube"].index(url), url=url)
         return True
 
-def get_int(prompt):
+def get_int(prompt, allow_empty=False):
     while True:
         user_input = input(prompt)
-        try:
-            int(user_input)
-        except ValueError:
-            print("Make your input an integer")
+        if allow_empty & (user_input == ""):
+            return user_input
         else:
-            return int(user_input)
+            try:
+                int(user_input)
+            except ValueError:
+                print("Make your input an integer")
+            else:
+                return int(user_input)
 
 
 
@@ -387,8 +390,12 @@ if __name__ == "__main__":
             print(f"Please select the songs you want to play.(TOTAL SONGS AVAILABLE: {link_count[0]})")
             low = get_int("Starting track number\n")
 
-            high = get_int("Ending track number(press enter to play only the starting track)\n")
-            if low > high:
+            high = get_int("Ending track number(press enter to play only the starting track)\n", allow_empty=True)
+            if high == "":
+                print(f"Playing single track: {low}")
+                loop = asyncio.get_event_loop()
+                loop.run_until_complete(bot.scheduled_tasks(start=low, stop=high))
+            elif low > high:
                 print(f"Your start track value: {low}, cannot be greater than your stop track value: {high}")
                 continue
             else:
