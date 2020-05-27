@@ -1,11 +1,15 @@
-EXE: Includes all necessary modules, and script files to run the program.
+Instructions:
+Select webdriver below(for your browser of choice):
 
-Users only need to download drivers for this option.  PLEASE MAKE SURE THE NECESSARY DRIVERS FOR YOUR BROWSER ARE IN THE SAME FOLDER AS THE EXE AND CONFIG FILE!
+Chrome - chromedriver.exe
+https://chromedriver.chromium.org/
 
-E.G.
+Firefox - geckodriver.exe
+https://github.com/mozilla/geckodriver/releases
 
-Chrome -> chromedriver.exe
+Internet Explorer - IEDriverServer.exe
+https://selenium.dev/downloads/
 
-Firefox -> geckodriver.exe
+Put driver into webdriver folder
 
-Internet Explorer -> IEDriverServer.exe
+run playlistbot.exe and enjoy :)
