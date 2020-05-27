@@ -1,5 +1,6 @@
 # Playlistbot
 A bot that grabs youtube urls from /r/musicforpeople and plays them for you.  Simply input a range of songs(5->200) and it will play those songs.
+![Demo example](example/script_example.gif)
 
 ## Driver Guide
 For users wanting to use this script with Chrome, [chromedriver.exe](https://chromedriver.chromium.org/)
