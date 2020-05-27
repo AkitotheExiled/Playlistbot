@@ -6,6 +6,12 @@ class dataFunc:
         self.conn = sqlite3.connect('youtube_url.sqlite')
         self.cursor = self.conn.cursor()
 
+    def count_links_and_print(self):
+        conn = sqlite3.connect('youtube_url.sqlite')
+        cursor = conn.cursor()
+        cursor.execute('''SELECT COUNT(*) FROM Youtube
+                                    ''')
+        return cursor.fetchone()
 
     def insert_into_table(self, pos, url):
         conn = sqlite3.connect('youtube_url.sqlite')

@@ -1,26 +1,22 @@
+import asyncio
 import praw
 from configparser import ConfigParser
 from datetime import datetime, timedelta
 from data_func import dataFunc
 import requests, requests.auth
-from threading import Thread
-import time
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchFrameException, WebDriverException, TimeoutException, JavascriptException
 import os, sys
-from queue import *
-
-
 
 
 
 class PlaylistBot():
 
     def __init__(self):
-        self.user_agent = "PlaylistBot V0.6 BETA by ScoopJr"
+        self.user_agent = "PlaylistBot V0.8 BETA by ScoopJr"
         print('Starting up...', self.user_agent)
         CONFIG = ConfigParser()
         CONFIG.read('config.ini')
@@ -33,15 +29,16 @@ class PlaylistBot():
         self.urls = set()
         self.post_link_date = None
         self.now = datetime.now()
-        self.thread_running = True
         self.repeat_url = None
         self.to_repeat = False
         self.should_skip = False
         self.should_stop = False
-        self.thread_should_stop = False
-        self.t1 = None
         self.last_post = None
-        self.queue = Queue()
+        self.task1 = None
+        self.task2 = None
+        self.task3 = None
+        self.url_index = None
+        self.get_url = None
         self.grab_last_post_time_file()
         self.check_for_webdriver()
 
@@ -164,10 +161,18 @@ class PlaylistBot():
             new_time[1] = f'0{str(time[1])}'
             time = tuple(new_time)
         return time
+
     def return_video_duration_in_seconds(self):
+        """Returns video duration in seconds using Youtube Player API function getDuration()"""
         video_len = self.driver.execute_script(
             "return document.getElementById('movie_player').getDuration()")
         return video_len
+
+    def return_video_title(self):
+        video_title = self.driver.execute_script(
+            "return document.getElementById('movie_player').getVideoData().title")
+        return video_title
+
     def ad_removal_before_video(self):
         """Waits for an ad and then selects skip ad"""
         try:
@@ -180,6 +185,21 @@ class PlaylistBot():
         except NoSuchFrameException:
             print('The script could not find the video player.  An ad may be playing right now!')
 
+    async def aio_readline(self, loop):
+        while True:
+            if self.should_stop:
+                return
+            print("Type yes to skip song.  Type stop to stop selection.")
+
+            line = await loop.run_in_executor(None, sys.stdin.readline)
+            if 'y' in line:
+                self.should_skip = True
+                print("skip should hapopen")
+            if 'st' in line:
+                self.should_stop = True
+                return
+            print('y' in line)
+
 
     def player_state_logic(self):
         """ Contains the logic for the different states of the player on Youtube.
@@ -190,73 +210,56 @@ class PlaylistBot():
         5 = Video is queued which means the video is generally not available since we're grabbing the link
 
         """
-        while True:
-            try:
-                player_state = self.driver.execute_script(
+        try:
+            player_state = self.driver.execute_script(
                 "return document.getElementById('movie_player').getPlayerState()")
-                if player_state == 1 or 3:
-                    return
-                if player_state == 0:
-                    self.driver.execute_script("return document.getElementById('movie_player').playVideo()")
+            if player_state is (1 or 3):
+                return
+            elif player_state == -1:
+                self.ad_removal_before_video()
+            elif player_state == 0:
+                self.driver.execute_script("return document.getElementById('movie_player').playVideo()")
                     #self.driver.execute_script('document.getElementsByTagName("video")[0].pause()')
-                if player_state == -1:
-                    self.ad_removal_before_video()
-                if player_state == 5:
-                    print("Video has been removed.  Going to next video.")
-                    self.should_skip = True
-                time.sleep(1)
-            except JavascriptException:
-                continue
+            elif player_state == 5:
+                print("Video has been removed.  Going to next video.")
+                self.should_skip = True
 
-    def get_video_time(self):
+        except JavascriptException:
+            return
+
+    async def get_video_time(self):
         """Gets the video playtime and presents it to the user in a readable format."""
+        self.player_state_logic()
         while True:
-            self.player_state_logic()
+            if self.should_stop:
+                return
             try:
                 video_time = self.driver.execute_script(
                     "return document.getElementById('movie_player').getCurrentTime()")
                 video_len = self.driver.execute_script(
                     "return document.getElementById('movie_player').getDuration()")
                 if video_time or video_len:
+                    if video_time == 0:
+                        self.player_state_logic()
                     cur_time = self.convert_video_time_to_minute_seconds(int(video_time))
                     total_dur = self.convert_video_time_to_minute_seconds(int(video_len))
-                    print(f"{cur_time[0]}:{cur_time[1]}/{total_dur[0]}:{total_dur[1]}")
-                    time.sleep(1)
+                    title = self.return_video_title()
+                    print(f"{title}\n{cur_time[0]}:{cur_time[1]}/{total_dur[0]}:{total_dur[1]}")
+                    await asyncio.sleep(1)
                     if ((cur_time[0] == total_dur[0]) and (cur_time[1] == total_dur[1])):
                         self.should_skip = True
-                        self.thread_should_stop = True
-                        sys.exit()
             except NoSuchFrameException:
                 continue
 
 
 
-    def should_skip_song(self, prompt='Do you want to skip this song?(type stop to redo track selection)'):
-        """Asks the user if they want to skip, repeat, or stop
-        skip - skips current song
-        repeat - repeats current song
-        stop - stops the entire selection and allows user to pick new songs to play from
-        """
-        skip_input = input(prompt)
-        while True:
-            if self.thread_should_stop:
-                return
-            if str(skip_input) == 'r' or 'repeat':
-                self.to_repeat = True
-                self.repeat_url = self.driver.current_url
-            if str(skip_input) == 'stop':
-                self.to_repeat = False
-                self.repeat_url = None
-                self.should_stop = True
-                return
-            if 's' or 'y' in str(skip_input):
-                self.to_repeat = False
-                self.repeat_url = None
-                self.should_skip = True
-                return
 
 
-    def play_song(self, start, stop=None):
+
+
+
+
+    async def play_song(self, start, stop=None):
         """Handles the playing of a song, takes a starting value, and an ending value"""
         self.should_stop = False
         db_func = dataFunc()
@@ -265,29 +268,60 @@ class PlaylistBot():
         for url in act_urls:
             if self.should_stop:
                 return
-            if self.to_repeat:
-                self.driver.get(self.repeat_url)
-            else:
-                self.driver.get(url)
+            self.should_skip = False
+            self.get_url = True
+            self.driver.get(url)
+            while True:
+                self.get_url = False
                 if self.should_skip or self.should_stop:
-                    self.should_skip = False
-                    #self.thread_running = True
-                    #self.thread_should_stop = False
-                    continue
+                    break
                 else:
-                    time_to_sleep = self.return_video_duration_in_seconds()
-                    time.sleep(time_to_sleep-4)
+                    await asyncio.sleep(1)
+        self.should_stop = True
+        return
 
 
-    def process_threads(self,start,stop):
-        while True:
-            self.t1 = Thread(target=self.get_video_time)
-            t2 = Thread(target=self.play_song, args=[start,stop])
-            t3 = Thread(target=self.should_skip_song)
-            t2.start()
-            self.t1.start()
-            t3.start()
-            t3.join()
+
+    async def scheduled_tasks(self, start, stop, stop_flag=False):
+        """Scheduling tasks for running"""
+        loop = asyncio.get_event_loop()
+        # tasks_for_each_url
+        task_per_url = []
+        # main task
+        mtask = self.play_song(start, stop)
+        # as long main task is running, each url in the for loop, run tasks_for_each_url
+        main_task = loop.create_task(mtask)
+        task2 = loop.create_task(self.get_video_time())
+        task1 = loop.create_task(self.aio_readline(loop))
+        await asyncio.gather(main_task,task2,task1)
+        main_task_is_done = main_task.done()
+        while not main_task_is_done:
+            print("in while")
+            await asyncio.sleep(1)
+            if task_per_url:
+                print((task2) in task_per_url)
+                continue
+            elif not task_per_url:
+                print(task_per_url)
+                if (task2.done() and task1.done()):
+                    task_per_url.append(task2)
+                    task_per_url.append(task1)
+                    for task in task_per_url:
+                        print("await task")
+                        await task
+                else:
+                    await asyncio.sleep(1)
+        return
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -299,6 +333,20 @@ class PlaylistBot():
         data_func = dataFunc()
         for url in data['youtube']:
             data_func.insert_into_table(pos=data['youtube'].index(url), url=url)
+
+def get_int(prompt):
+    while True:
+        user_input = input(prompt)
+        try:
+            int(user_input)
+        except ValueError:
+            print("Make your input an integer")
+        else:
+            return user_input
+
+
+
+
 
 
 if __name__ == "__main__":
@@ -315,8 +363,14 @@ if __name__ == "__main__":
             bot.play_song(start=low, stop=high)
     else:
         while True:
-            print('Please select the songs you want to play.')
-            low = input('Starting track number')
-            high = input('Ending track number(press enter to play only the starting track)')
-            bot.process_threads(start=low, stop=high)
+            df = dataFunc()
+            link_count = df.count_links_and_print()
+            print(f'Please select the songs you want to play.(TOTAL SONGS AVAILABLE: {link_count[0]})')
+            low = get_int('Starting track number\n')
+
+            high = get_int('Ending track number(press enter to play only the starting track)\n')
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(bot.scheduled_tasks(start=low,stop=high))
+            #asyncio.run()
+
             #bot.play_song(start=low, stop=high)
