@@ -16,7 +16,7 @@ import os, sys
 class PlaylistBot():
 
     def __init__(self):
-        self.user_agent = "PlaylistBot V0.85 BETA by ScoopJr"
+        self.user_agent = "PlaylistBot V0.90 BETA by ScoopJr"
         print("Starting up...", self.user_agent)
         CONFIG = ConfigParser()
         CONFIG.read("config.ini")
@@ -384,7 +384,7 @@ def get_int(prompt):
         except ValueError:
             print("Make your input an integer")
         else:
-            return user_input
+            return int(user_input)
 
 
 
@@ -411,8 +411,10 @@ if __name__ == "__main__":
             low = get_int("Starting track number\n")
 
             high = get_int("Ending track number(press enter to play only the starting track)\n")
-            loop = asyncio.get_event_loop()
-            loop.run_until_complete(bot.scheduled_tasks(start=low,stop=high))
-            #asyncio.run()
+            if low > high:
+                print(f"Your start track value: {low}, cannot be greater than your stop track value: {high}")
+                continue
+            else:
+                loop = asyncio.get_event_loop()
+                loop.run_until_complete(bot.scheduled_tasks(start=low,stop=high))
 
-            #bot.play_song(start=low, stop=high)
