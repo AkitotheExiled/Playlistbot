@@ -16,15 +16,15 @@ import os, sys
 class PlaylistBot():
 
     def __init__(self):
-        self.user_agent = "PlaylistBot V0.8 BETA by ScoopJr"
-        print('Starting up...', self.user_agent)
+        self.user_agent = "PlaylistBot V0.85 BETA by ScoopJr"
+        print("Starting up...", self.user_agent)
         CONFIG = ConfigParser()
-        CONFIG.read('config.ini')
-        self.user = CONFIG.get('main', 'USER')
-        self.password = CONFIG.get('main', 'PASSWORD')
-        self.client = CONFIG.get('main', 'CLIENT_ID')
-        self.secret = CONFIG.get('main', 'SECRET')
-        self.subreddit = CONFIG.get('main', 'SUBREDDIT')
+        CONFIG.read("config.ini")
+        self.user = CONFIG.get("main", "USER")
+        self.password = CONFIG.get("main", "PASSWORD")
+        self.client = CONFIG.get("main", "CLIENT_ID")
+        self.secret = CONFIG.get("main", "SECRET")
+        self.subreddit = CONFIG.get("main", "SUBREDDIT")
         self.subs = {}
         self.urls = set()
         self.post_link_date = None
@@ -45,48 +45,83 @@ class PlaylistBot():
     def grab_last_post_time_file(self):
         """Checks for lastposttime.txt and if it exists use the UTC inside as a reference for the last post grabbed.  Otherwise make new file"""
         try:
-            with open('lastposttime.txt', 'r') as r:
+            with open("lastposttime.txt", "r") as r:
                 data = r.read()
             # self.before is the timestamp used to determine where the bot should start on next run
             self.before = data
-            print('The last grabbed posts UTC timestamp is', self.before)
+            print("The last grabbed posts UTC timestamp is", self.before)
         except IOError:
-            print('Could not read file: lastposttime.txt')
-            self.before = 'Never.'
+            print("Could not read file: lastposttime.txt")
+            self.before = "Never."
         if not self.before:
-            self.before = 'Never.'
+            self.before = "Never."
 
     def check_for_webdriver(self):
-        """Checks for the appropriate webdriver for this script.  If the driver doesn't exist, stop the bot and return an error message"""
-        print('Now searching for the appropriate driver.. Please make sure your driver is in the script folder.')
+        """Checks for the appropriate webdriver for this script.  If the driver doesn"t exist, stop the bot and return an error message"""
+        print("Now searching for the appropriate driver.. Please make sure your driver is in the script folder.")
         for filename in os.listdir(os.getcwd()):
-            if filename == 'chromedriver.exe':
+            if filename == "chromedriver.exe":
                 try:
-                    self.driver = webdriver.Chrome('chromedriver.exe')
+                    self.driver = webdriver.Chrome("chromedriver.exe")
                 except WebDriverException:
                     print(
-                        'MESSAGE: chromedriver.exe was not found.  Please download chromedriver.exe from '
-                        ' https://chromedriver.chromium.org/' + '.' )
+                        "MESSAGE: chromedriver.exe was not found.  Please download chromedriver.exe from "
+                        " https://chromedriver.chromium.org/" + "." )
                     print("MESSAGE: Make sure chromedriver.exe and playlistbot.exe are in the same folder!")
                     exit()
-            if filename == 'geckodriver.exe':
+            elif filename == "geckodriver.exe":
                 try:
-                    self.driver = webdriver.Firefox('geckodriver.exe')
+                    self.driver = webdriver.Firefox("geckodriver.exe")
                 except WebDriverException:
                     print(
-                        'MESSAGE: geckodriver.ex was not found.  Please download geckodriver.ex from '
-                        ' https://github.com/mozilla/geckodriver/releases' + '.')
+                        "MESSAGE: geckodriver.ex was not found.  Please download geckodriver.ex from "
+                        " https://github.com/mozilla/geckodriver/releases" + ".")
                     print("MESSAGE: Make sure geckodriver.ex and playlistbot.exe are in the same folder!")
                     exit()
-            if filename == 'IEDriverServer.exe':
+            elif filename == "IEDriverServer.exe":
                 try:
-                    self.driver = webdriver.Ie('IEDriverServer.exe')
+                    self.driver = webdriver.Ie("IEDriverServer.exe")
                 except WebDriverException:
                     print(
-                        'MESSAGE: IRDriverServer.exe was not found.  Please download IRDriverServer.exe from '
-                        ' https://selenium-release.storage.googleapis.com/index.html' + '.')
+                        "MESSAGE: IRDriverServer.exe was not found.  Please download IRDriverServer.exe from "
+                        " https://selenium-release.storage.googleapis.com/index.html" + ".")
                     print("MESSAGE: Make sure IRDriverServer.exe and playlistbot.exe are in the same folder!")
                     exit()
+            elif filename == "webdriver":
+                try:
+                    os.chdir("webdriver")
+                    for file in os.listdir(os.getcwd()):
+                        if file == "chromedriver.exe":
+                            try:
+                                self.driver = webdriver.Chrome("chromedriver.exe")
+                            except WebDriverException:
+                                print(
+                                    "MESSAGE: chromedriver.exe was not found.  Please download chromedriver.exe from "
+                                    " https://chromedriver.chromium.org/" + ".")
+                                print("MESSAGE: Make sure chromedriver.exe and playlistbot.exe are in the same folder!")
+                                exit()
+                        elif file == "geckodriver.exe":
+                            try:
+                                self.driver = webdriver.Firefox("geckodriver.exe")
+                            except WebDriverException:
+                                print(
+                                    "MESSAGE: geckodriver.ex was not found.  Please download geckodriver.ex from "
+                                    " https://github.com/mozilla/geckodriver/releases" + ".")
+                                print("MESSAGE: Make sure geckodriver.ex and playlistbot.exe are in the same folder!")
+                                exit()
+                        elif file == "IEDriverServer.exe":
+                            try:
+                                self.driver = webdriver.Ie("IEDriverServer.exe")
+                            except WebDriverException:
+                                print(
+                                    "MESSAGE: IRDriverServer.exe was not found.  Please download IRDriverServer.exe from "
+                                    " https://selenium-release.storage.googleapis.com/index.html" + ".")
+                                print("MESSAGE: Make sure IRDriverServer.exe and playlistbot.exe are in the same folder!")
+                                exit()
+                except:
+                    print("Unable to change directory.  Make sure webdriver folder exists.")
+
+
 
     def timedelta_to_largest_time(self, timedelta):
         """Code for converting a timedelta into a days/hours/minutes/second format for the URL function"""
@@ -100,9 +135,9 @@ class PlaylistBot():
         except AttributeError as e:
             print(e)
         if days <= 0:
-            return str(hours) + 'h'
+            return str(hours) + "h"
         else:
-            return str(days) + 'd'
+            return str(days) + "d"
 
     def grab_urls(self, time='', before=''):
         """Grabs all posts for the subreddit and puts their created_utc, archived status, locked status into a dictionary self.subs categorized under their post.id"""
@@ -111,23 +146,23 @@ class PlaylistBot():
         size = 500
         befor = before
         after = time
-        if self.before != 'Never.':
+        if self.before != "Never.":
             befor = self.before
-            after = '1h'
+            after = "1h"
         url = "https://api.pushshift.io/reddit/submission/search/?subreddit={}&size={}&before={}&after={}".format(
             subreddit, size, befor, after)
         response = requests.get(url).json()
         print(response)
-        if response['data']:
+        if response["data"]:
             last_post_time = None
             final_post = None
-            for item in response['data']:
-                self.urls.add(item['url'])
-                last_post_time = item['created_utc']
-                pre_post_time = datetime.utcfromtimestamp(int(last_post_time)).strftime('%Y-%m-%d %H:%M:%S')
-                post_time = datetime.strptime(pre_post_time, '%Y-%m-%d %H:%M:%S')
+            for item in response["data"]:
+                self.urls.add(item["url"])
+                last_post_time = item["created_utc"]
+                pre_post_time = datetime.utcfromtimestamp(int(last_post_time)).strftime("%Y-%m-%d %H:%M:%S")
+                post_time = datetime.strptime(pre_post_time, "%Y-%m-%d %H:%M:%S")
                 final_post = last_post_time
-            with open('lastposttime.txt', 'w+') as f:
+            with open("lastposttime.txt", "w+") as f:
                 f.write(str(final_post))
             self.grab_urls(before=last_post_time)
         else:
@@ -144,13 +179,13 @@ class PlaylistBot():
         other_list = []
         youtube_list = []
         for url in urls2:
-            if (('youtube' in url) or ('youtu.be' in url)) & ('reddit' not in url):
+            if (("youtube" in url) or ("youtu.be" in url)) & ("reddit" not in url):
                 youtube_list.append(url)
-            if 'soundcloud' in url:
+            if "soundcloud" in url:
                 sc_list.append(url)
-            if 'youtube' not in url and 'soundcloud' not in url and 'youtu.be' not in url:
+            if "youtube" not in url and "soundcloud" not in url and "youtu.be" not in url:
                 other_list.append(url)
-        return {'youtube': youtube_list, 'soundcloud': sc_list, 'other': other_list}
+        return {"youtube": youtube_list, "soundcloud": sc_list, "other": other_list}
 
 
     def convert_video_time_to_minute_seconds(self, time_seconds):
@@ -158,7 +193,7 @@ class PlaylistBot():
         time = divmod(time_seconds, 60)
         if time[1] < 10:
             new_time = list(time)
-            new_time[1] = f'0{str(time[1])}'
+            new_time[1] = f"0{str(time[1])}"
             time = tuple(new_time)
         return time
 
@@ -181,9 +216,12 @@ class PlaylistBot():
                 WebDriverWait(self.driver, 15).until(EC.element_to_be_clickable(
                     (By.XPATH, "//button[@class='ytp-ad-skip-button ytp-button']"))).click()
             except TimeoutException as e:
-                print(e.msg)
+                try:
+                    self.driver.execute_script("return document.getElementById('movie_player').playVideo()")
+                except:
+                    pass
         except NoSuchFrameException:
-            print('The script could not find the video player.  An ad may be playing right now!')
+            print("The script could not find the video player.  An ad may be playing right now!")
 
     async def aio_readline(self, loop):
         while True:
@@ -192,13 +230,14 @@ class PlaylistBot():
             print("Type yes to skip song.  Type stop to stop selection.")
 
             line = await loop.run_in_executor(None, sys.stdin.readline)
-            if 'y' in line:
+            if "y" in line:
                 self.should_skip = True
+                await asyncio.sleep(1)
                 print("skip should hapopen")
-            if 'st' in line:
+            if "st" in line:
                 self.should_stop = True
                 return
-            print('y' in line)
+            print("y" in line)
 
 
     def player_state_logic(self):
@@ -213,6 +252,7 @@ class PlaylistBot():
         try:
             player_state = self.driver.execute_script(
                 "return document.getElementById('movie_player').getPlayerState()")
+            print(f"PLAYERSTATE: {player_state}")
             if player_state is (1 or 3):
                 return
             elif player_state == -1:
@@ -223,7 +263,6 @@ class PlaylistBot():
             elif player_state == 5:
                 print("Video has been removed.  Going to next video.")
                 self.should_skip = True
-
         except JavascriptException:
             return
 
@@ -238,7 +277,10 @@ class PlaylistBot():
                     "return document.getElementById('movie_player').getCurrentTime()")
                 video_len = self.driver.execute_script(
                     "return document.getElementById('movie_player').getDuration()")
-                if video_time or video_len:
+                if video_len == 0:
+                    self.player_state_logic()
+                    await asyncio.sleep(1)
+                elif video_time or video_len:
                     if video_time == 0:
                         self.player_state_logic()
                     cur_time = self.convert_video_time_to_minute_seconds(int(video_time))
@@ -331,8 +373,8 @@ class PlaylistBot():
         self.grab_urls()
         data = self.sort_urls_by_domain(list(self.urls))
         data_func = dataFunc()
-        for url in data['youtube']:
-            data_func.insert_into_table(pos=data['youtube'].index(url), url=url)
+        for url in data["youtube"]:
+            data_func.insert_into_table(pos=data["youtube"].index(url), url=url)
 
 def get_int(prompt):
     while True:
@@ -351,13 +393,13 @@ def get_int(prompt):
 
 if __name__ == "__main__":
     bot = PlaylistBot()
-    answ = input('First run or updating your database?')
-    if 'y' in answ:
+    answ = input("First run or updating your database?")
+    if "y" in answ:
         bot.normal_run()
         while True:
-            print('Please enter the songs you want to play.')
-            low = input('Starting track number')
-            high = input('Ending track number(press enter to play only the starting track)')
+            print("Please enter the songs you want to play.")
+            low = input("Starting track number")
+            high = input("Ending track number(press enter to play only the starting track)")
             if high == '':
                 high = None
             bot.play_song(start=low, stop=high)
@@ -365,10 +407,10 @@ if __name__ == "__main__":
         while True:
             df = dataFunc()
             link_count = df.count_links_and_print()
-            print(f'Please select the songs you want to play.(TOTAL SONGS AVAILABLE: {link_count[0]})')
-            low = get_int('Starting track number\n')
+            print(f"Please select the songs you want to play.(TOTAL SONGS AVAILABLE: {link_count[0]})")
+            low = get_int("Starting track number\n")
 
-            high = get_int('Ending track number(press enter to play only the starting track)\n')
+            high = get_int("Ending track number(press enter to play only the starting track)\n")
             loop = asyncio.get_event_loop()
             loop.run_until_complete(bot.scheduled_tasks(start=low,stop=high))
             #asyncio.run()
