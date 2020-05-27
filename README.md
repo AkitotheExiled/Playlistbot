@@ -10,7 +10,7 @@ For users wanting to use this script with Internet Explorer, [IEDriverServer.exe
 
 ### Simple Usage Guide
 1. Go to executable folder 
-2. Place your driver from the Driver Guide into /executable/webdriver folder.
+2. Place your driver from the Driver Guide into the executable folder.
 3. Run playlistbot.exe
 
 #### Script FAQ Guide
