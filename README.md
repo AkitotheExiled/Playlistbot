@@ -64,16 +64,17 @@ websocket-client==0.57.0
 Issue Tracker: https://github.com/AkitotheExiled/Playlistbot/issues
 
 ### Script FAQ Guide
-1. How do I skip a song?
-Type y or yeah after you pick a song or songs!
+* How do I skip a song?
 
-2. I've selected songs and want to start a new selection, how do I do that?
+> Type y or yeah after you pick a song or songs!
 
-Type stop when the bot asks if you want to skip or stop.  If will ask you to select a new set of songs.
+* I've selected songs and want to start a new selection, how do I do that?
 
-3. How do I only play one song?
+> Type stop when the bot asks if you want to skip or stop.  If will ask you to select a new set of songs.
 
-When it asks for an ending track number, press enter.
+* How do I only play one song?
+
+> When it asks for an ending track number, press enter.
 
 ### Contact
 https://www.reddit.com/user/ScoopJr
