@@ -8,13 +8,16 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchFrameException, WebDriverException, TimeoutException, JavascriptException
-import os, sys
+import os, sys, time
 
 
 
 class PlaylistBot():
 
     def __init__(self):
+        """Create a new PlaylistBot instance.
+
+        """
         self.user_agent = "PlaylistBot V1.0 by ScoopJr"
         print("Starting up...", self.user_agent)
         CONFIG = ConfigParser()
@@ -30,6 +33,7 @@ class PlaylistBot():
         self.final_post = None
         self.last_post_time = None
         self.first_run = False
+        self.done = False
 
         self.grab_last_post_time_file()
         self.check_for_webdriver()
@@ -40,19 +44,28 @@ class PlaylistBot():
             with open("lastposttime.txt", "r") as r:
                 data = r.read()
             # self.before is the timestamp used to determine where the bot should start on next run
-            self.before = data
-            print("The last grabbed posts UTC timestamp is", self.before)
-            self.wrote_utc = True
+            if data == "None":
+                self.before = "Never."
+            else:
+                self.before = data
+                print("The last grabbed posts UTC timestamp is", self.before)
+                self.wrote_utc = True
         except IOError:
             print("Could not read file: lastposttime.txt")
             self.before = "Never."
             self.first_run = True
             self.wrote_utc = False
-        if not self.before:
+        if not self.before or self.before is None:
             self.before = "Never."
 
     def check_for_webdriver(self):
-        """Checks for the appropriate webdriver for this script.  If the driver doesn"t exist, stop the bot and return an error message"""
+        """Checks for the following webdrivers:
+        chromedriver.exe
+        geckodriver.exe
+        IEDriverserver.exe
+
+        in the webdriver folder.
+        """
         print("Now searching for the appropriate driver.. Please make sure your driver is in the script folder.")
         for filename in os.listdir(os.getcwd()):
             if filename == "chromedriver.exe":
@@ -117,50 +130,68 @@ class PlaylistBot():
                     print("Unable to change directory.  Make sure webdriver folder exists.")
 
 
-
     def grab_urls(self):
-        """Grabs all posts for the subreddit and puts their created_utc, archived status, locked status into a dictionary self.subs categorized under their post.id"""
-
-        subreddit = self.subreddit
-        size = 500
-        print(self.before == "Never.")
-        if (self.first_run and (self.before == "Never.") ):
-            befor = "1h"
-            after = 1547856000
-        elif self.first_run:
-            befor = self.before
-            after = 1547856000
-        else:
-            befor = "1h"
-            after = self.before
-        url = "https://api.pushshift.io/reddit/submission/search/?subreddit={}&sort=desc&sort_type=created_utc&size={}&after={}&before={}".format(
-            subreddit, size, after, befor)
-        response = requests.get(url).json()
-
-        if response["data"]:
-
-            for item in response["data"]:
-                self.urls.add(item["url"])
-                if not self.wrote_utc:
-                    self.last_post_time = item["created_utc"]
-                    self.wrote_utc = True
-
-                self.final_post = item["created_utc"]
-            self.before = self.final_post
-            self.grab_urls()
-        else:
-            if self.last_post_time is None:
-                print("No new songs found.  Returning to track selection.")
-                return list(self.urls)
+        """
+        Retrieves all Youtube URL links from /r/musicforpeople since it was created(Jan 19, 2019)
+        Sorts them into a set
+        Returns the sorted URLS in a set once no more Youtube LINKS can be pulled from the API
+        """
+        i = 0
+        headers = {'user-agent': 'Playlistbot 1.0 by ScoopJr'}
+        while i <= 0:
+            time.sleep(3)
+            subreddit = self.subreddit
+            size = 100
+            print(self.before == "Never.")
+            if (self.first_run or (self.before == "Never.") ):
+                befor = "1h"
+                after = 1547856000
+            elif self.first_run or not self.done:
+                befor = self.before
+                after = 1547856000
             else:
-                with open("lastposttime.txt", "w+") as f:
-                    f.write(str(self.last_post_time))
-                    f.close()
-                return list(self.urls)
+                befor = "1h"
+                after = self.before
+            start = time.time()
 
-    # PYTHON
+            url = "https://api.pushshift.io/reddit/submission/search/?subreddit={}&sort=desc&sort_type=created_utc&size={}&after={}&before={}".format(
+                subreddit, size, after, befor)
+            response = requests.get(url, headers=headers).json()
+            stop = time.time()
+            print("Elapsed in seconds:" + str(stop - start))
+            if response["data"]:
+                print("Songs are being found...")
+                for item in response["data"]:
+                    print(f"Adding {item['url']}")
+                    self.urls.add(item["url"])
+                    if not self.wrote_utc:
+                        self.last_post_time = item["created_utc"]
+                        self.wrote_utc = True
+
+                    self.final_post = item["created_utc"]
+                self.before = self.final_post
+                i+=1
+            else:
+                if self.last_post_time is None:
+                    print("No new songs found.  Returning to track selection.")
+                    return list(self.urls)
+                else:
+                    self.done = True
+                    with open("lastposttime.txt", "w+") as f:
+                        f.write(str(self.last_post_time))
+                        f.close()
+                    return list(self.urls)
+        with open("lastposttime.txt", "w+") as f:
+            f.write(str(self.last_post_time))
+            f.close()
+        return list(self.urls)
+
+
     def sort_urls_by_domain(self, urls):
-        """Takes a list of urls and sorts them by domain name and returns a dictionary"""
+        """
+        urls - a mutable list that should contain links to youtube, and soundcloud
+        It categorizes the links into Youtube, and Soundcloud and returns a dict with the keys, youtube, and soundcloud, and other.
+        """
         try:
             urls2 = list(urls)
         except TypeError as e:
@@ -179,7 +210,14 @@ class PlaylistBot():
 
 
     def convert_video_time_to_minute_seconds(self, time_seconds):
-        """Converts seconds into a tuple(minute, seconds) and returns it"""
+        """
+        time_seconds - integer value that represents time in seconds(I.E. 300 time_seconds = 300 seconds)
+        Returns a tuple of the form (minute, seconds)
+
+        I.E.
+        convert_video_time_to_minute_seconds(300)
+        returns (5,0)
+        """
         time = divmod(time_seconds, 60)
         if time[1] < 10:
             new_time = list(time)
@@ -188,18 +226,29 @@ class PlaylistBot():
         return time
 
     def return_video_duration_in_seconds(self):
-        """Returns video duration in seconds using Youtube Player API function getDuration()"""
+        """
+        Executes Javascript - player.getDuration() to return video duration in seconds
+        """
         video_len = self.driver.execute_script(
             "return document.getElementById('movie_player').getDuration()")
         return video_len
 
     def return_video_title(self):
+        """
+        Executes Javascropt - player.getVideoData().title
+        player.getVideoData() - Youtube API to return player data
+        .title - attribute referring to video title
+        returns video title
+        """
         video_title = self.driver.execute_script(
             "return document.getElementById('movie_player').getVideoData().title")
         return video_title
 
     def ad_removal_before_video(self):
-        """Waits for an ad and then selects skip ad"""
+        """
+        Waits 15 seconds until the button, skip ad, on youtube is clickable and clicks it.
+        Otherwise, it times out and trys to play the video using player.playVideo()
+        """
         try:
             # self.driver.switch_to.frame(self.driver.find_element_by_id('player'))
             try:
@@ -214,6 +263,12 @@ class PlaylistBot():
             print("The script could not find the video player.  An ad may be playing right now!")
 
     async def aio_readline(self, loop):
+        """
+        async input function
+        loop - the current running loop
+        If the user input contains, 'y' then it changes the condition of skip to True and awaits to allow asyncio to skip the song
+        If the user input contains, 's' then it changes the condition of stop to True and awaits to allow asyncio to stop the current song selection
+        """
         while True:
             if self.should_stop:
                 return
@@ -232,11 +287,11 @@ class PlaylistBot():
 
     def player_state_logic(self):
         """ Contains the logic for the different states of the player on Youtube.
-        1 = video is playing
-        0 = video is paused
-        -1 = video is not playing(usually an ad is playing)
-        3 = buffering
-        5 = Video is queued which means the video is generally not available since we're grabbing the link
+        1 = video is playing - function returns since that is default playback
+        0 = video is paused - function does nothing
+        -1 = video is not playing(usually an ad is playing) - runs ad_removal_before_video()
+        3 = buffering - lets video buffer
+        5 = Video is queued - video may not be available and sets skip condition to True
 
         """
         try:
@@ -267,11 +322,11 @@ class PlaylistBot():
                     "return document.getElementById('movie_player').getCurrentTime()")
                 video_len = self.driver.execute_script(
                     "return document.getElementById('movie_player').getDuration()")
-                if video_len == 0:
+                if video_len == 0: # Video may have been removed - call player_state_logic() to skip song
                     self.player_state_logic()
                     await asyncio.sleep(1)
                 elif video_time or video_len:
-                    if video_time == 0:
+                    if video_time == 0: # Video may be stuck on an ad
                         self.player_state_logic()
                     cur_time = self.convert_video_time_to_minute_seconds(int(video_time))
                     total_dur = self.convert_video_time_to_minute_seconds(int(video_len))
@@ -325,9 +380,9 @@ class PlaylistBot():
         main_task = loop.create_task(mtask)
         task2 = loop.create_task(self.get_video_time())
         task1 = loop.create_task(self.aio_readline(loop))
-        await asyncio.gather(main_task,task2,task1)
+        await asyncio.gather(main_task,task2,task1) # running all tasks at once
         main_task_is_done = main_task.done()
-        while not main_task_is_done:
+        while not main_task_is_done: # If other tasks stop and we're still playing songs, run them again
             print("in while")
             await asyncio.sleep(1)
             if task_per_url:
@@ -353,17 +408,28 @@ class PlaylistBot():
 
 
     def update_database(self):
-        print("Updating the database, this may take a while.")
+        """
+        Handles the updating of the database.
 
-        self.grab_urls()
-        data = self.sort_urls_by_domain(list(self.urls))
-        print(data)
-        data_func = dataFunc()
-        for url in data["youtube"]:
-            data_func.insert_into_table(pos=data["youtube"].index(url), url=url)
+        """
+        print("Updating the database, this may take a while.")
+        self.grab_last_post_time_file()
+        while not self.done:
+            self.grab_urls()
+            data = self.sort_urls_by_domain(list(self.urls))
+            data_func = dataFunc()
+            for url in data["youtube"]:
+                data_func.insert_into_table(pos=data["youtube"].index(url), url=url)
         return True
 
 def get_int(prompt, allow_empty=False):
+    """
+     prompt: - The text displayed to the user so they respond
+     allow_empty: - Allows the user to enter an empty string
+     default: returns integer representation of user input
+     if allow_empty = True,
+     allows user to return empty string
+    """
     while True:
         user_input = input(prompt)
         if allow_empty & (user_input == ""):
@@ -391,6 +457,7 @@ if __name__ == "__main__":
             low = get_int("Starting track number\n")
 
             high = get_int("Ending track number(press enter to play only the starting track)\n", allow_empty=True)
+
             if high == "":
                 print(f"Playing single track: {low}")
                 loop = asyncio.get_event_loop()
@@ -413,6 +480,5 @@ if __name__ == "__main__":
             run()
         else:
             run()
-
 
 
